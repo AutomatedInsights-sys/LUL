@@ -122,12 +122,20 @@ export default function DashboardPage() {
               </Link>
             )}
             {todayLog && (
-              <Link
-                href="/log"
-                className="border border-teal-500/40 text-teal-400 text-sm px-4 py-2 rounded-lg hover:bg-teal-500/10 transition-colors"
-              >
-                ✓ Logged
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/agent?date=${todayLog.date}`}
+                  className="border border-violet-500/40 text-violet-400 text-sm px-3 py-2 rounded-lg hover:bg-violet-500/10 transition-colors flex items-center gap-1.5"
+                >
+                  ✨ Share
+                </Link>
+                <Link
+                  href="/log"
+                  className="border border-teal-500/40 text-teal-400 text-sm px-3 py-2 rounded-lg hover:bg-teal-500/10 transition-colors"
+                >
+                  ✓ Logged
+                </Link>
+              </div>
             )}
           </div>
 

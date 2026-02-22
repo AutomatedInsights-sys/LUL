@@ -4,12 +4,23 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
-const navItems = [
+// All items shown in desktop sidebar
+const sidebarItems = [
   { href: '/log', label: 'Log', icon: '✏️' },
   { href: '/dashboard', label: 'Dashboard', icon: '🎯' },
   { href: '/journal', label: 'Journal', icon: '📓' },
   { href: '/analytics', label: 'Analytics', icon: '📊' },
+  { href: '/agent', label: 'AI Agent', icon: '✨' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },
+];
+
+// Trimmed set for mobile bottom bar (space-constrained)
+const mobileItems = [
+  { href: '/log', label: 'Log', icon: '✏️' },
+  { href: '/dashboard', label: 'Dashboard', icon: '🎯' },
+  { href: '/journal', label: 'Journal', icon: '📓' },
+  { href: '/agent', label: 'AI Agent', icon: '✨' },
+  { href: '/analytics', label: 'Stats', icon: '📊' },
 ];
 
 export default function NavBar() {
@@ -25,7 +36,7 @@ export default function NavBar() {
         </div>
 
         <nav className="flex flex-col gap-1 flex-1">
-          {navItems.map((item) => (
+          {sidebarItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -56,7 +67,7 @@ export default function NavBar() {
 
       {/* Mobile bottom bar */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#0A0A18] border-t border-[#1E1E3F] flex">
-        {navItems.map((item) => (
+        {mobileItems.map((item) => (
           <Link
             key={item.href}
             href={item.href}

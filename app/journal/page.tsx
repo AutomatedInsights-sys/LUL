@@ -259,20 +259,28 @@ export default function JournalPage() {
                           </div>
                         )}
 
-                        {/* Domain scores as a quick reference */}
-                        <div className="flex gap-3 pt-1 border-t border-[#1A1A3A]">
-                          {[
-                            { icon: '🔥', val: log.body_score },
-                            { icon: '💰', val: log.wealth_score },
-                            { icon: '⚡', val: log.skill_score },
-                            { icon: '🛡️', val: log.discipline_score },
-                            { icon: '❤️', val: log.presence_score },
-                          ].map(({ icon, val }) => (
-                            <div key={icon} className="text-center">
-                              <div className="text-sm">{icon}</div>
-                              <div className="text-xs text-slate-500">{Math.round(val ?? 0)}</div>
-                            </div>
-                          ))}
+                        {/* Domain scores + Share link */}
+                        <div className="flex items-center justify-between pt-1 border-t border-[#1A1A3A]">
+                          <div className="flex gap-3">
+                            {[
+                              { icon: '🔥', val: log.body_score },
+                              { icon: '💰', val: log.wealth_score },
+                              { icon: '⚡', val: log.skill_score },
+                              { icon: '🛡️', val: log.discipline_score },
+                              { icon: '❤️', val: log.presence_score },
+                            ].map(({ icon, val }) => (
+                              <div key={icon} className="text-center">
+                                <div className="text-sm">{icon}</div>
+                                <div className="text-xs text-slate-500">{Math.round(val ?? 0)}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <Link
+                            href={`/agent?date=${log.date}`}
+                            className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1 transition-colors"
+                          >
+                            ✨ Generate post
+                          </Link>
                         </div>
                       </div>
                     )}
