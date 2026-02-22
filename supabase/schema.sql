@@ -57,6 +57,12 @@ CREATE TABLE IF NOT EXISTS public.daily_logs (
   score_tier TEXT CHECK (score_tier IN ('S', 'A', 'B', 'C', 'D')),
   xp_awarded INTEGER,
 
+  -- Journal
+  day_win        BOOLEAN DEFAULT NULL,
+  went_well      TEXT DEFAULT NULL,
+  could_improve  TEXT DEFAULT NULL,
+  tomorrow_focus TEXT DEFAULT NULL,
+
   created_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(user_id, date)
 );

@@ -91,6 +91,15 @@ export default function DashboardPage() {
     ? Math.round(scored.reduce((a, l) => a + (l.daily_life_score ?? 0), 0) / scored.length)
     : 0;
 
+  // Yesterday's journal (tomorrow_focus becomes today's mission)
+  const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+  const yesterdayLog = recentLogs.find((l) => l.date === yesterday);
+
+  // Win/Loss rate (last 30 days with a verdict)
+  const judgedLogs = recentLogs.filter((l) => l.day_win !== null);
+  const winCount = judgedLogs.filter((l) => l.day_win === true).length;
+  const winRate = judgedLogs.length ? Math.round((winCount / judgedLogs.length) * 100) : null;
+
   return (
     <div className="min-h-screen bg-[#0D0D1A]">
       <NavBar />
@@ -227,6 +236,62 @@ export default function DashboardPage() {
             </>
           )}
 
+          {/* Journal panels */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Today's mission (from yesterday's focus) */}
+            <Card className="border-l-[3px] border-l-violet-500">
+              <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">📓 Today's Mission</p>
+              {yesterdayLog?.tomorrow_focus ? (
+                <p className="text-sm text-slate-200 leading-relaxed">
+                  "{yesterdayLog.tomorrow_focus}"
+                </p>
+              ) : (
+                <p className="text-sm text-slate-600 italic">
+                  No focus set for today.{' '}
+                  <Link href="/log" className="text-violet-400 hover:text-violet-300 not-italic">
+                    Set one in today's log →
+                  </Link>
+                </p>
+              )}
+            </Card>
+
+            {/* Win / Loss rate */}
+            <Card className="border-l-[3px] border-l-teal-500">
+              <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">🏆 Win Rate (30 days)</p>
+              {winRate !== null ? (
+                <div className="flex items-end gap-3">
+                  <span className="text-3xl font-bold text-teal-400">{winRate}%</span>
+                  <span className="text-sm text-slate-400 mb-1">
+                    {winCount}W / {judgedLogs.length - winCount}L
+                  </span>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-600 italic">
+                  Mark days as wins or losses in your{' '}
+                  <Link href="/log" className="text-violet-400 hover:text-violet-300 not-italic">
+                    daily journal
+                  </Link>
+                </p>
+              )}
+              {todayLog?.day_win !== null && todayLog?.day_win !== undefined && (
+                <p className="text-xs mt-2">
+                  Today:{' '}
+                  <span className={todayLog.day_win ? 'text-teal-400 font-semibold' : 'text-red-400 font-semibold'}>
+                    {todayLog.day_win ? '🏆 Win' : '📉 Loss'}
+                  </span>
+                </p>
+              )}
+            </Card>
+          </div>
+
+          {/* Yesterday's reflection (if they wrote something) */}
+          {yesterdayLog?.could_improve && (
+            <div className="mb-4 bg-[#12122A] border border-[#1E1E3F] border-l-[3px] border-l-amber-500/60 rounded-xl px-4 py-3">
+              <p className="text-xs text-amber-400/80 uppercase tracking-wider mb-1">Yesterday — Room to Improve</p>
+              <p className="text-sm text-slate-300 italic">"{yesterdayLog.could_improve}"</p>
+            </div>
+          )}
+
           {/* Recent log history */}
           <Card>
             <div className="flex items-center justify-between mb-4">
@@ -248,6 +313,9 @@ export default function DashboardPage() {
                       <span className={`text-xs px-2 py-0.5 rounded border ${tierBgColor(log.score_tier ?? 'D')}`}>
                         {log.score_tier}
                       </span>
+                      {log.day_win !== null && (
+                        <span className="text-sm">{log.day_win ? '🏆' : '📉'}</span>
+                      )}
                       <span className="text-sm text-slate-400">
                         {formatDate(log.date)}
                       </span>

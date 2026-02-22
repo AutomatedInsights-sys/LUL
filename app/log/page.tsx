@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateDailyScore, applyStreakMultiplier } from '@/lib/scoring';
-import { DailyInputs, DomainWeights, User, DailyLog } from '@/lib/types';
+import { DailyInputs, DomainWeights, User, DailyLog, JournalEntry } from '@/lib/types';
 import { todayISO, tierBgColor } from '@/lib/utils';
 import NavBar from '@/components/NavBar';
 import { Card } from '@/components/ui/Card';
@@ -106,11 +106,19 @@ function FieldRow({ label, hint, children }: { label: string; hint?: string; chi
   );
 }
 
+const DEFAULT_JOURNAL: JournalEntry = {
+  day_win: null,
+  went_well: '',
+  could_improve: '',
+  tomorrow_focus: '',
+};
+
 export default function LogPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [inputs, setInputs] = useState<DailyInputs>(DEFAULT_INPUTS);
   const [weights, setWeights] = useState<DomainWeights>(DEFAULT_WEIGHTS);
+  const [journal, setJournal] = useState<JournalEntry>(DEFAULT_JOURNAL);
   const [existingLog, setExistingLog] = useState<DailyLog | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -161,6 +169,12 @@ export default function LogPage() {
             familyMeal: log.family_meal ?? false,
           };
           setInputs(restored);
+          setJournal({
+            day_win: log.day_win ?? null,
+            went_well: log.went_well ?? '',
+            could_improve: log.could_improve ?? '',
+            tomorrow_focus: log.tomorrow_focus ?? '',
+          });
           setSubmitted(true);
         } else {
           setInputs((prev) => ({ ...prev, skillRepTarget: rep_target }));
@@ -176,6 +190,11 @@ export default function LogPage() {
 
   const update = useCallback(<K extends keyof DailyInputs>(key: K, value: DailyInputs[K]) => {
     setInputs((prev) => ({ ...prev, [key]: value }));
+    if (submitted) setSubmitted(false);
+  }, [submitted]);
+
+  const updateJournal = useCallback(<K extends keyof JournalEntry>(key: K, value: JournalEntry[K]) => {
+    setJournal((prev) => ({ ...prev, [key]: value }));
     if (submitted) setSubmitted(false);
   }, [submitted]);
 
@@ -213,6 +232,11 @@ export default function LogPage() {
       daily_life_score: score.daily,
       score_tier: score.tier,
       xp_awarded: finalXP,
+      // Journal
+      day_win: journal.day_win,
+      went_well: journal.went_well || null,
+      could_improve: journal.could_improve || null,
+      tomorrow_focus: journal.tomorrow_focus || null,
     };
 
     if (existingLog) {
@@ -469,6 +493,93 @@ export default function LogPage() {
                 <div className="px-4 py-1">{section.fields}</div>
               </Card>
             ))}
+
+            {/* Journal */}
+            <Card className="overflow-hidden !p-0">
+              <div
+                className="flex items-center justify-between px-4 py-3 border-b border-[#1E1E3F]"
+                style={{ borderLeftColor: '#A78BFA', borderLeftWidth: 3 }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">📓</span>
+                  <span className="font-semibold text-white">Daily Journal</span>
+                </div>
+                <span className="text-xs text-slate-500">Optional — 60-second reflection</span>
+              </div>
+
+              <div className="px-4 py-4 space-y-5">
+                {/* Win / Loss */}
+                <div>
+                  <p className="text-sm font-medium text-slate-200 mb-3">Was today a win?</p>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => updateJournal('day_win', journal.day_win === true ? null : true)}
+                      className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 flex items-center justify-center gap-2 ${
+                        journal.day_win === true
+                          ? 'bg-teal-500/20 border-teal-500 text-teal-300'
+                          : 'bg-transparent border-[#2D2D5E] text-slate-500 hover:border-teal-500/50 hover:text-teal-400'
+                      }`}
+                    >
+                      <span className="text-xl">🏆</span> Win
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateJournal('day_win', journal.day_win === false ? null : false)}
+                      className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border-2 flex items-center justify-center gap-2 ${
+                        journal.day_win === false
+                          ? 'bg-red-500/20 border-red-500 text-red-300'
+                          : 'bg-transparent border-[#2D2D5E] text-slate-500 hover:border-red-500/50 hover:text-red-400'
+                      }`}
+                    >
+                      <span className="text-xl">📉</span> Loss
+                    </button>
+                  </div>
+                </div>
+
+                {/* What went well */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-200 mb-1.5">
+                    What went well today?
+                  </label>
+                  <textarea
+                    value={journal.went_well}
+                    onChange={(e) => updateJournal('went_well', e.target.value)}
+                    rows={2}
+                    placeholder="The morning block was locked in. Nailed the workout early..."
+                    className="w-full bg-[#0D0D1A] border border-[#2D2D5E] rounded-lg px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 transition-colors resize-none"
+                  />
+                </div>
+
+                {/* What could have been better */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-200 mb-1.5">
+                    What could I have done better?
+                  </label>
+                  <textarea
+                    value={journal.could_improve}
+                    onChange={(e) => updateJournal('could_improve', e.target.value)}
+                    rows={2}
+                    placeholder="Scrolled too long after lunch. Skipped the second skill session..."
+                    className="w-full bg-[#0D0D1A] border border-[#2D2D5E] rounded-lg px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 transition-colors resize-none"
+                  />
+                </div>
+
+                {/* Tomorrow's focus */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-200 mb-1.5">
+                    Focus for tomorrow
+                  </label>
+                  <textarea
+                    value={journal.tomorrow_focus}
+                    onChange={(e) => updateJournal('tomorrow_focus', e.target.value)}
+                    rows={2}
+                    placeholder="Close the Acme deal. Hit 10k steps before noon. No phone until 9am..."
+                    className="w-full bg-[#0D0D1A] border border-[#2D2D5E] rounded-lg px-4 py-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-violet-500 transition-colors resize-none"
+                  />
+                </div>
+              </div>
+            </Card>
 
             {/* Submit */}
             <button

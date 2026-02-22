@@ -52,7 +52,19 @@ export interface DailyLog {
   daily_life_score: number | null;
   score_tier: ScoreTier | null;
   xp_awarded: number | null;
+  // Journal
+  day_win: boolean | null;
+  went_well: string | null;
+  could_improve: string | null;
+  tomorrow_focus: string | null;
   created_at: string;
+}
+
+export interface JournalEntry {
+  day_win: boolean | null;
+  went_well: string;
+  could_improve: string;
+  tomorrow_focus: string;
 }
 
 export type ScoreTier = 'S' | 'A' | 'B' | 'C' | 'D';
