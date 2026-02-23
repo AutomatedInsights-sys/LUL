@@ -19,6 +19,7 @@ export interface Penalty {
   completed: boolean;
   completed_at: string | null;
   score_restored: number | null;
+  dismissed: boolean;
   created_at: string;
 }
 

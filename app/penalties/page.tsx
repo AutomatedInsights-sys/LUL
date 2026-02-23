@@ -95,6 +95,18 @@ export default function PenaltiesPage() {
     setActionLoading(null);
   }
 
+  async function handleDismiss(penaltyId: string) {
+    setActionLoading(penaltyId);
+    const { error } = await supabase.from('penalties').update({ dismissed: true }).eq('id', penaltyId);
+    if (!error) {
+      setPenalties((prev) => prev.map((p) => p.id === penaltyId ? { ...p, dismissed: true } : p));
+      showToast('Penalty declined — score stays as-is.');
+    } else {
+      showToast('Failed to decline penalty.', 'error');
+    }
+    setActionLoading(null);
+  }
+
   async function handleMarkDone(penalty: Penalty) {
     setActionLoading(penalty.id);
 
@@ -131,11 +143,12 @@ export default function PenaltiesPage() {
     );
   }
 
-  const pending = penalties.filter((p) => !p.completed);
-  const history = penalties.filter((p) => p.completed);
+  const pending = penalties.filter((p) => !p.completed && !p.dismissed);
+  const history = penalties.filter((p) => p.completed || p.dismissed);
+  const completed = penalties.filter((p) => p.completed);
   const totalEarned = (user?.penalty_tokens ?? 0) + (user?.penalty_tokens_spent ?? 0);
   const completionRate = penalties.length > 0
-    ? Math.round((history.length / penalties.length) * 100)
+    ? Math.round((completed.length / penalties.length) * 100)
     : null;
 
   const tokenCount = user?.penalty_tokens ?? 0;
@@ -237,7 +250,7 @@ export default function PenaltiesPage() {
             </Card>
             <Card className="text-center !py-2">
               <p className="text-xs text-slate-500">Completed</p>
-              <p className="text-xl font-bold text-teal-400">{history.length}</p>
+              <p className="text-xl font-bold text-teal-400">{completed.length}</p>
             </Card>
             <Card className="text-center !py-2">
               <p className="text-xs text-slate-500">Done %</p>
@@ -316,9 +329,17 @@ export default function PenaltiesPage() {
                           {actionLoading === pen.id ? 'Applying...' : '✓ Mark Done'}
                         </button>
                       )}
+                      <button
+                        onClick={() => handleDismiss(pen.id)}
+                        disabled={actionLoading === pen.id}
+                        className="bg-[#1E1E3F] hover:bg-[#2D2D5E] border border-[#2D2D5E] text-slate-500 hover:text-slate-300 text-sm px-3 py-2 rounded-lg transition-all disabled:opacity-40"
+                        title="Decline — keep current score, no token spent"
+                      >
+                        Decline
+                      </button>
                     </div>
                     {!pen.token_used && tokenCount < 1 && (
-                      <p className="text-xs text-slate-600 mt-2 text-center">No tokens available — buy one above or earn via streak</p>
+                      <p className="text-xs text-slate-600 mt-2 text-center">No tokens — buy one above, earn via streak, or decline to clear</p>
                     )}
                   </div>
                 ))
@@ -331,31 +352,41 @@ export default function PenaltiesPage() {
             <div className="space-y-3">
               {history.length === 0 ? (
                 <Card className="text-center py-10">
-                  <p className="text-slate-500 text-sm">No completed penalties yet.</p>
+                  <p className="text-slate-500 text-sm">No history yet.</p>
                 </Card>
               ) : (
                 history.map((pen) => (
                   <div
                     key={pen.id}
-                    className="bg-[#12122A] border border-[#1E1E3F] border-l-[3px] border-l-teal-500 rounded-xl p-4"
+                    className={`bg-[#12122A] border border-[#1E1E3F] border-l-[3px] rounded-xl p-4 ${
+                      pen.dismissed ? 'border-l-slate-600' : 'border-l-teal-500'
+                    }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-teal-400">✓</span>
+                          <span className={pen.dismissed ? 'text-slate-500' : 'text-teal-400'}>
+                            {pen.dismissed ? '—' : '✓'}
+                          </span>
                           <p className="text-sm font-semibold text-white">{pen.rule_label}</p>
                         </div>
                         <p className="text-xs text-slate-500">
                           {format(new Date(pen.log_date + 'T12:00:00'), 'EEE, MMM d')}
                         </p>
-                        <p className="text-xs text-slate-400 mt-1">Completed: {pen.penalty_text}</p>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {pen.dismissed ? 'Declined — no token spent' : `Completed: ${pen.penalty_text}`}
+                        </p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        {pen.score_restored != null && (
+                        {pen.dismissed ? (
+                          <span className="text-xs bg-slate-700/50 text-slate-500 border border-slate-600/30 px-2 py-0.5 rounded-full">
+                            Declined
+                          </span>
+                        ) : pen.score_restored != null ? (
                           <span className="text-xs bg-teal-500/20 text-teal-400 border border-teal-500/30 px-2 py-0.5 rounded-full">
                             +{Math.round(pen.score_restored)} pts
                           </span>
-                        )}
+                        ) : null}
                         {pen.completed_at && (
                           <p className="text-xs text-slate-600 mt-1">
                             {format(new Date(pen.completed_at), 'h:mmaaa')}

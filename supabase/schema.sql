@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS public.penalties (
   completed      BOOLEAN DEFAULT FALSE,
   completed_at   TIMESTAMPTZ,
   score_restored FLOAT,
+  dismissed      BOOLEAN DEFAULT FALSE,
   created_at     TIMESTAMPTZ DEFAULT now(),
   UNIQUE(user_id, log_date, rule_id)
 );

@@ -42,7 +42,8 @@ export default function DashboardPage() {
           .from('penalties')
           .select('id')
           .eq('user_id', authUser.id)
-          .eq('completed', false),
+          .eq('completed', false)
+          .eq('dismissed', false),
       ]);
 
       if (profile) setUser(profile as User);
