@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS public.users (
   current_streak INTEGER DEFAULT 0,
   longest_streak INTEGER DEFAULT 0,
   onboarding_complete BOOLEAN DEFAULT false,
+  penalty_rules JSONB DEFAULT '[
+    {"id":"doom_scroll","rule_label":"Doom Scrolled AM","penalty_text":"10 pushups","recovery_pts":30,"enabled":true,"builtin":true},
+    {"id":"missed_operator_hour","rule_label":"Missed Operator Hour","penalty_text":"+20 min skill work","recovery_pts":30,"enabled":true,"builtin":true}
+  ]'::jsonb,
+  penalty_tokens INTEGER DEFAULT 3,
+  penalty_tokens_spent INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -117,6 +123,39 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Penalties table
+CREATE TABLE IF NOT EXISTS public.penalties (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  log_date       DATE NOT NULL,
+  rule_id        TEXT NOT NULL,
+  rule_label     TEXT NOT NULL,
+  penalty_text   TEXT NOT NULL,
+  recovery_pts   FLOAT NOT NULL DEFAULT 0,
+  token_used     BOOLEAN DEFAULT FALSE,
+  completed      BOOLEAN DEFAULT FALSE,
+  completed_at   TIMESTAMPTZ,
+  score_restored FLOAT,
+  created_at     TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(user_id, log_date, rule_id)
+);
+
+ALTER TABLE public.penalties ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own penalties"
+  ON public.penalties FOR SELECT
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can insert own penalties"
+  ON public.penalties FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update own penalties"
+  ON public.penalties FOR UPDATE
+  USING (auth.uid() = user_id);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS daily_logs_user_date ON public.daily_logs(user_id, date DESC);
 CREATE INDEX IF NOT EXISTS daily_logs_date ON public.daily_logs(date);
+CREATE INDEX IF NOT EXISTS penalties_user_date ON public.penalties(user_id, log_date DESC);
+CREATE INDEX IF NOT EXISTS penalties_user_pending ON public.penalties(user_id, completed) WHERE completed = FALSE;

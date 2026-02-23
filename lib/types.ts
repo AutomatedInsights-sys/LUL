@@ -1,3 +1,27 @@
+export interface PenaltyRule {
+  id: string;           // 'doom_scroll' | 'missed_operator_hour' | uuid
+  rule_label: string;   // "Doom Scrolled AM"
+  penalty_text: string; // "10 pushups"
+  recovery_pts: number; // discipline pts restored on completion (max 50)
+  enabled: boolean;
+  builtin?: boolean;    // true = auto-detected from log toggles
+}
+
+export interface Penalty {
+  id: string;
+  user_id: string;
+  log_date: string;
+  rule_id: string;
+  rule_label: string;
+  penalty_text: string;
+  recovery_pts: number;
+  token_used: boolean;
+  completed: boolean;
+  completed_at: string | null;
+  score_restored: number | null;
+  created_at: string;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -10,6 +34,9 @@ export interface User {
   total_xp: number;
   current_streak: number;
   longest_streak: number;
+  penalty_rules: PenaltyRule[] | null;
+  penalty_tokens: number;
+  penalty_tokens_spent: number;
   created_at: string;
 }
 

@@ -5,7 +5,8 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { calculateDailyScore, applyStreakMultiplier } from '@/lib/scoring';
-import { DailyInputs, DomainWeights, User, DailyLog, JournalEntry } from '@/lib/types';
+import { DailyInputs, DomainWeights, User, DailyLog, JournalEntry, PenaltyRule } from '@/lib/types';
+import { detectTriggeredPenalties, checkStreakTokenReward } from '@/lib/penalties';
 import { todayISO, tierBgColor } from '@/lib/utils';
 import NavBar from '@/components/NavBar';
 import { Card } from '@/components/ui/Card';
@@ -123,6 +124,10 @@ export default function LogPage() {
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [liveScore, setLiveScore] = useState(() => calculateDailyScore(DEFAULT_INPUTS, DEFAULT_WEIGHTS));
+  const [penaltyRules, setPenaltyRules] = useState<PenaltyRule[]>([]);
+  const [customViolations, setCustomViolations] = useState<string[]>([]);
+  const [tokenCount, setTokenCount] = useState(0);
+  const [streakToast, setStreakToast] = useState<string | null>(null);
 
   const today = todayISO();
 
@@ -142,6 +147,11 @@ export default function LogPage() {
         const w = profile.domain_weights || DEFAULT_WEIGHTS;
         setWeights(w);
         const rep_target = profile.skill_rep_target || 3;
+        setPenaltyRules(profile.penalty_rules ?? [
+          { id: 'doom_scroll', rule_label: 'Doom Scrolled AM', penalty_text: '10 pushups', recovery_pts: 30, enabled: true, builtin: true },
+          { id: 'missed_operator_hour', rule_label: 'Missed Operator Hour', penalty_text: '+20 min skill work', recovery_pts: 30, enabled: true, builtin: true },
+        ]);
+        setTokenCount(profile.penalty_tokens ?? 3);
 
         const { data: log } = await supabase
           .from('daily_logs')
@@ -246,25 +256,58 @@ export default function LogPage() {
       if (inserted) setExistingLog(inserted as DailyLog);
 
       // Update user XP, streak, level
+      const prevStreak = user?.current_streak ?? 0;
       const newXP = (user?.total_xp ?? 0) + finalXP;
-      const newStreak = (user?.current_streak ?? 0) + 1;
+      const newStreak = score.daily >= 45 ? prevStreak + 1 : 0;
       const newLevel = Math.min(100, Math.floor(newXP / 1000) + 1);
       const newLongest = Math.max(user?.longest_streak ?? 0, newStreak);
 
-      await supabase.from('users').update({
+      // Check for streak milestone token rewards
+      const tokenBonus = checkStreakTokenReward(prevStreak, newStreak);
+      const newTokens = tokenBonus > 0 ? Math.min(10, tokenCount + tokenBonus) : tokenCount;
+
+      const userUpdate: Record<string, unknown> = {
         total_xp: newXP,
-        current_streak: score.daily >= 45 ? newStreak : 0,
+        current_streak: newStreak,
         longest_streak: newLongest,
         level: newLevel,
-      }).eq('id', authUser.id);
+      };
+      if (tokenBonus > 0) {
+        userUpdate.penalty_tokens = newTokens;
+      }
+
+      await supabase.from('users').update(userUpdate).eq('id', authUser.id);
+
+      if (tokenBonus > 0) {
+        setTokenCount(newTokens);
+        setStreakToast(`🪙 +${tokenBonus} token${tokenBonus > 1 ? 's' : ''} earned for ${newStreak}-day streak!`);
+        setTimeout(() => setStreakToast(null), 4000);
+      }
 
       setUser((prev) => prev ? {
         ...prev,
         total_xp: newXP,
-        current_streak: score.daily >= 45 ? newStreak : 0,
+        current_streak: newStreak,
         longest_streak: newLongest,
         level: newLevel,
+        penalty_tokens: newTokens,
       } : prev);
+    }
+
+    // Upsert penalties for triggered violations (never double-insert)
+    const triggered = detectTriggeredPenalties(inputs, penaltyRules, customViolations);
+    for (const rule of triggered) {
+      await supabase.from('penalties').upsert(
+        {
+          user_id: authUser.id,
+          log_date: today,
+          rule_id: rule.id,
+          rule_label: rule.rule_label,
+          penalty_text: rule.penalty_text,
+          recovery_pts: rule.recovery_pts,
+        },
+        { onConflict: 'user_id,log_date,rule_id', ignoreDuplicates: true }
+      );
     }
 
     setSubmitted(true);
@@ -428,6 +471,11 @@ export default function LogPage() {
   return (
     <div className="min-h-screen bg-[#0D0D1A]">
       <NavBar />
+      {streakToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-amber-500 text-black text-sm font-bold px-4 py-2 rounded-full shadow-lg animate-bounce">
+          {streakToast}
+        </div>
+      )}
       <div className="md:ml-56 pb-24 md:pb-8">
         <div className="max-w-2xl mx-auto px-4 py-6">
           {/* Header */}
@@ -493,6 +541,82 @@ export default function LogPage() {
                 <div className="px-4 py-1">{section.fields}</div>
               </Card>
             ))}
+
+            {/* Rule Violations */}
+            {(() => {
+              const builtinTriggered = penaltyRules.filter(
+                (r) => r.enabled && r.builtin && (
+                  (r.id === 'doom_scroll' && !inputs.noScrollAm) ||
+                  (r.id === 'missed_operator_hour' && !inputs.operatorHour)
+                )
+              );
+              const customRules = penaltyRules.filter((r) => r.enabled && !r.builtin);
+              if (builtinTriggered.length === 0 && customRules.length === 0) return null;
+              return (
+                <Card className="overflow-hidden !p-0">
+                  <div
+                    className="flex items-center justify-between px-4 py-3 border-b border-[#1E1E3F]"
+                    style={{ borderLeftColor: '#F59E0B', borderLeftWidth: 3 }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">⚠️</span>
+                      <span className="font-semibold text-white">Rule Violations</span>
+                    </div>
+                    <span className="text-xs text-amber-400">🪙 {tokenCount} token{tokenCount !== 1 ? 's' : ''}</span>
+                  </div>
+
+                  <div className="px-4 py-3 space-y-3">
+                    {/* Auto-detected violations */}
+                    {builtinTriggered.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">Auto-detected</p>
+                        {builtinTriggered.map((rule) => (
+                          <div key={rule.id} className="flex items-center justify-between gap-3 bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2">
+                            <div>
+                              <p className="text-sm font-medium text-red-300">🚫 {rule.rule_label}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                Penalty: {rule.penalty_text} · +{rule.recovery_pts} pts back if redeemed
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Custom rule self-report */}
+                    {customRules.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs text-slate-500 uppercase tracking-wider">Custom rules — did you break any?</p>
+                        {customRules.map((rule) => (
+                          <label key={rule.id} className="flex items-center gap-3 bg-[#0D0D1A] border border-[#2D2D5E] rounded-lg px-3 py-2 cursor-pointer hover:border-amber-500/30 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={customViolations.includes(rule.id)}
+                              onChange={(e) => {
+                                setCustomViolations((prev) =>
+                                  e.target.checked ? [...prev, rule.id] : prev.filter((id) => id !== rule.id)
+                                );
+                              }}
+                              className="w-4 h-4 accent-amber-500"
+                            />
+                            <div>
+                              <p className="text-sm font-medium text-slate-300">{rule.rule_label}</p>
+                              <p className="text-xs text-slate-500 mt-0.5">
+                                {rule.penalty_text} · +{rule.recovery_pts} pts back if redeemed
+                              </p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+
+                    <p className="text-xs text-slate-600">
+                      Completing a penalty with a token restores points to your score. You have {tokenCount} token{tokenCount !== 1 ? 's' : ''} remaining.
+                    </p>
+                  </div>
+                </Card>
+              );
+            })()}
 
             {/* Journal */}
             <Card className="overflow-hidden !p-0">
