@@ -11,6 +11,7 @@ import NavBar from '@/components/NavBar';
 import { Card } from '@/components/ui/Card';
 import ScoreRing from '@/components/ui/ScoreRing';
 import { useRouter } from 'next/navigation';
+import { format, subDays, addDays, parseISO } from 'date-fns';
 
 const DEFAULT_WEIGHTS: DomainWeights = { body: 25, wealth: 25, skill: 20, discipline: 15, presence: 15 };
 
@@ -123,11 +124,27 @@ export default function LogPage() {
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [liveScore, setLiveScore] = useState(() => calculateDailyScore(DEFAULT_INPUTS, DEFAULT_WEIGHTS));
+  const [selectedDate, setSelectedDate] = useState(todayISO());
 
   const today = todayISO();
+  const isToday = selectedDate === today;
+  const minDate = format(subDays(new Date(), 7), 'yyyy-MM-dd');
+  const canGoBack = selectedDate > minDate;
+  const canGoForward = selectedDate < today;
 
+  const userRef = useRef<User | null>(null);
+
+  function changeDate(newDate: string) {
+    setSelectedDate(newDate);
+    setInputs({ ...DEFAULT_INPUTS, skillRepTarget: userRef.current?.skill_rep_target || 3 });
+    setJournal(DEFAULT_JOURNAL);
+    setExistingLog(null);
+    setSubmitted(false);
+  }
+
+  // Load user profile once
   useEffect(() => {
-    async function load() {
+    async function loadProfile() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) { router.push('/login'); return; }
 
@@ -139,50 +156,59 @@ export default function LogPage() {
 
       if (profile) {
         setUser(profile as User);
+        userRef.current = profile as User;
         const w = profile.domain_weights || DEFAULT_WEIGHTS;
         setWeights(w);
-        const rep_target = profile.skill_rep_target || 3;
-
-        const { data: log } = await supabase
-          .from('daily_logs')
-          .select('*')
-          .eq('user_id', authUser.id)
-          .eq('date', today)
-          .maybeSingle();
-
-        if (log) {
-          setExistingLog(log as DailyLog);
-          const restored: DailyInputs = {
-            steps: log.steps ?? 0,
-            workoutDone: log.workout_done ?? false,
-            workoutMinutes: log.workout_minutes ?? 0,
-            sleepHours: log.sleep_hours ?? 7,
-            wealthMinutes: log.wealth_minutes ?? 0,
-            assetBrick: log.asset_brick ?? false,
-            sideRevenue: log.side_revenue ?? 0,
-            skillMinutes: log.skill_minutes ?? 0,
-            skillReps: log.skill_reps ?? 0,
-            skillRepTarget: rep_target,
-            operatorHour: log.operator_hour ?? false,
-            noScrollAm: log.no_scroll_am ?? false,
-            presenceMinutes: log.presence_minutes ?? 0,
-            familyMeal: log.family_meal ?? false,
-          };
-          setInputs(restored);
-          setJournal({
-            day_win: log.day_win ?? null,
-            went_well: log.went_well ?? '',
-            could_improve: log.could_improve ?? '',
-            tomorrow_focus: log.tomorrow_focus ?? '',
-          });
-          setSubmitted(true);
-        } else {
-          setInputs((prev) => ({ ...prev, skillRepTarget: rep_target }));
-        }
+        setInputs((prev) => ({ ...prev, skillRepTarget: profile.skill_rep_target || 3 }));
       }
     }
-    load();
-  }, [router, today]);
+    loadProfile();
+  }, [router]);
+
+  // Load log for selected date
+  useEffect(() => {
+    async function loadLog() {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
+
+      const { data: log } = await supabase
+        .from('daily_logs')
+        .select('*')
+        .eq('user_id', authUser.id)
+        .eq('date', selectedDate)
+        .maybeSingle();
+
+      if (log) {
+        setExistingLog(log as DailyLog);
+        const rep_target = userRef.current?.skill_rep_target || 3;
+        const restored: DailyInputs = {
+          steps: log.steps ?? 0,
+          workoutDone: log.workout_done ?? false,
+          workoutMinutes: log.workout_minutes ?? 0,
+          sleepHours: log.sleep_hours ?? 7,
+          wealthMinutes: log.wealth_minutes ?? 0,
+          assetBrick: log.asset_brick ?? false,
+          sideRevenue: log.side_revenue ?? 0,
+          skillMinutes: log.skill_minutes ?? 0,
+          skillReps: log.skill_reps ?? 0,
+          skillRepTarget: rep_target,
+          operatorHour: log.operator_hour ?? false,
+          noScrollAm: log.no_scroll_am ?? false,
+          presenceMinutes: log.presence_minutes ?? 0,
+          familyMeal: log.family_meal ?? false,
+        };
+        setInputs(restored);
+        setJournal({
+          day_win: log.day_win ?? null,
+          went_well: log.went_well ?? '',
+          could_improve: log.could_improve ?? '',
+          tomorrow_focus: log.tomorrow_focus ?? '',
+        });
+        setSubmitted(true);
+      }
+    }
+    loadLog();
+  }, [selectedDate]);
 
   useEffect(() => {
     setLiveScore(calculateDailyScore(inputs, weights));
@@ -210,7 +236,7 @@ export default function LogPage() {
 
     const logData = {
       user_id: authUser.id,
-      date: today,
+      date: selectedDate,
       steps: inputs.steps,
       workout_done: inputs.workoutDone,
       workout_minutes: inputs.workoutMinutes,
@@ -430,12 +456,41 @@ export default function LogPage() {
       <NavBar />
       <div className="md:ml-56 pb-24 md:pb-8">
         <div className="max-w-2xl mx-auto px-4 py-6">
-          {/* Header */}
+          {/* Header with date picker */}
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-white">Daily Log</h1>
-            <p className="text-slate-400 text-sm mt-1">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            </p>
+            <div className="flex items-center gap-3 mt-2">
+              <button
+                type="button"
+                onClick={() => canGoBack && changeDate(format(subDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
+                disabled={!canGoBack}
+                className="w-8 h-8 rounded-lg bg-[#1E1E3F] hover:bg-[#2D2D5E] text-slate-400 hover:text-white flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ‹
+              </button>
+              <div className="text-center">
+                <p className="text-sm font-medium text-white">
+                  {format(parseISO(selectedDate), 'EEEE, MMMM d')}
+                </p>
+                {!isToday && (
+                  <button
+                    type="button"
+                    onClick={() => changeDate(today)}
+                    className="text-xs text-violet-400 hover:text-violet-300 mt-0.5 transition-colors"
+                  >
+                    Back to today
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => canGoForward && changeDate(format(addDays(parseISO(selectedDate), 1), 'yyyy-MM-dd'))}
+                disabled={!canGoForward}
+                className="w-8 h-8 rounded-lg bg-[#1E1E3F] hover:bg-[#2D2D5E] text-slate-400 hover:text-white flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ›
+              </button>
+            </div>
           </div>
 
           {/* Live Score Preview */}
