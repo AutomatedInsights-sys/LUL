@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import NavBar from '@/components/NavBar';
 import { Card } from '@/components/ui/Card';
-import { User, DomainWeights } from '@/lib/types';
+import { User, DomainWeights, PenaltyRule } from '@/lib/types';
 import { DEFAULT_WEIGHTS } from '@/lib/scoring';
 
 export default function SettingsPage() {
@@ -23,6 +23,7 @@ export default function SettingsPage() {
   const [skillRepTarget, setSkillRepTarget] = useState(3);
   const [scoreTarget, setScoreTarget] = useState(75);
   const [weights, setWeights] = useState<DomainWeights>(DEFAULT_WEIGHTS);
+  const [penaltyRules, setPenaltyRules] = useState<PenaltyRule[]>([]);
 
   const domainsOrder: (keyof DomainWeights)[] = ['body', 'wealth', 'skill', 'discipline', 'presence'];
   const domainIcons: Record<keyof DomainWeights, string> = { body: '🔥', wealth: '💰', skill: '⚡', discipline: '🛡️', presence: '❤️' };
@@ -47,6 +48,10 @@ export default function SettingsPage() {
         setSkillRepTarget(profile.skill_rep_target ?? 3);
         setScoreTarget(profile.score_target ?? 75);
         setWeights(profile.domain_weights ?? DEFAULT_WEIGHTS);
+        setPenaltyRules(profile.penalty_rules ?? [
+          { id: 'doom_scroll', rule_label: 'Doom Scrolled AM', penalty_text: '10 pushups', recovery_pts: 30, enabled: true, builtin: true },
+          { id: 'missed_operator_hour', rule_label: 'Missed Operator Hour', penalty_text: '+20 min skill work', recovery_pts: 30, enabled: true, builtin: true },
+        ]);
       }
       setLoading(false);
     }
@@ -64,6 +69,7 @@ export default function SettingsPage() {
       skill_rep_target: skillRepTarget,
       score_target: scoreTarget,
       domain_weights: weights,
+      penalty_rules: penaltyRules,
     }).eq('id', user.id);
 
     setSaving(false);
@@ -119,6 +125,24 @@ export default function SettingsPage() {
   function updateWeight(domain: keyof DomainWeights, value: number) {
     setWeights((prev) => ({ ...prev, [domain]: value }));
   }
+
+  function updatePenaltyRule(id: string, field: keyof PenaltyRule, value: string | number | boolean) {
+    setPenaltyRules((prev) => prev.map((r) => r.id === id ? { ...r, [field]: value } : r));
+  }
+
+  function addCustomRule() {
+    setPenaltyRules((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), rule_label: '', penalty_text: '', recovery_pts: 10, enabled: true, builtin: false },
+    ]);
+  }
+
+  function removeCustomRule(id: string) {
+    setPenaltyRules((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  const builtinRules = penaltyRules.filter((r) => r.builtin);
+  const customRules = penaltyRules.filter((r) => !r.builtin);
 
   if (loading) {
     return (
@@ -265,6 +289,116 @@ export default function SettingsPage() {
               >
                 Reset to defaults
               </button>
+            </Card>
+
+            {/* Penalty Rules */}
+            <Card>
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">⚠️ Penalty Rules</h2>
+
+              <div className="mb-5">
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Built-in (auto-detected from daily log)</p>
+                <div className="space-y-3">
+                  {builtinRules.map((rule) => (
+                    <div key={rule.id} className="bg-[#0D0D1A] border border-[#2D2D5E] rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-slate-300">{rule.rule_label}</span>
+                        <button
+                          type="button"
+                          onClick={() => updatePenaltyRule(rule.id, 'enabled', !rule.enabled)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${rule.enabled ? 'bg-violet-600' : 'bg-slate-700'}`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${rule.enabled ? 'translate-x-4' : 'translate-x-1'}`} />
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="text-xs text-slate-500 mb-1 block">Penalty task</label>
+                          <input
+                            type="text"
+                            value={rule.penalty_text}
+                            onChange={(e) => updatePenaltyRule(rule.id, 'penalty_text', e.target.value)}
+                            className="w-full bg-[#12122A] border border-[#2D2D5E] rounded px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
+                        <div className="w-24">
+                          <label className="text-xs text-slate-500 mb-1 block">Recovery pts</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            value={rule.recovery_pts}
+                            onChange={(e) => updatePenaltyRule(rule.id, 'recovery_pts', Math.min(50, Number(e.target.value)))}
+                            className="w-full bg-[#12122A] border border-[#2D2D5E] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Your Custom Rules (self-reported)</p>
+                <div className="space-y-3">
+                  {customRules.map((rule) => (
+                    <div key={rule.id} className="bg-[#0D0D1A] border border-[#2D2D5E] rounded-lg p-3">
+                      <div className="flex gap-2 mb-2">
+                        <div className="flex-1">
+                          <label className="text-xs text-slate-500 mb-1 block">Rule name</label>
+                          <input
+                            type="text"
+                            value={rule.rule_label}
+                            onChange={(e) => updatePenaltyRule(rule.id, 'rule_label', e.target.value)}
+                            placeholder="No phone at dinner"
+                            className="w-full bg-[#12122A] border border-[#2D2D5E] rounded px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeCustomRule(rule.id)}
+                          className="text-slate-600 hover:text-red-400 transition-colors text-lg self-end mb-0.5"
+                        >
+                          🗑
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <label className="text-xs text-slate-500 mb-1 block">Penalty task</label>
+                          <input
+                            type="text"
+                            value={rule.penalty_text}
+                            onChange={(e) => updatePenaltyRule(rule.id, 'penalty_text', e.target.value)}
+                            placeholder="10 pushups"
+                            className="w-full bg-[#12122A] border border-[#2D2D5E] rounded px-2 py-1.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
+                        <div className="w-24">
+                          <label className="text-xs text-slate-500 mb-1 block">Recovery pts</label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={50}
+                            value={rule.recovery_pts}
+                            onChange={(e) => updatePenaltyRule(rule.id, 'recovery_pts', Math.min(50, Number(e.target.value)))}
+                            className="w-full bg-[#12122A] border border-[#2D2D5E] rounded px-2 py-1.5 text-xs text-white focus:outline-none focus:border-violet-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addCustomRule}
+                  className="mt-3 text-xs text-violet-400 hover:text-violet-300 transition-colors border border-violet-600/30 hover:border-violet-500/50 rounded-lg px-3 py-2 w-full"
+                >
+                  + Add Custom Rule
+                </button>
+              </div>
+
+              <p className="text-xs text-slate-600 mt-4">
+                Recovery pts are added to your Discipline score when you complete the penalty using a token. Max 50 pts per rule.
+              </p>
             </Card>
 
             {/* Account info */}

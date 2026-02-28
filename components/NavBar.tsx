@@ -9,6 +9,7 @@ const sidebarItems = [
   { href: '/log', label: 'Log', icon: '✏️' },
   { href: '/dashboard', label: 'Dashboard', icon: '🎯' },
   { href: '/journal', label: 'Journal', icon: '📓' },
+  { href: '/penalties', label: 'Penalties', icon: '⚠️' },
   { href: '/analytics', label: 'Analytics', icon: '📊' },
   { href: '/agent', label: 'AI Agent', icon: '✨' },
   { href: '/settings', label: 'Settings', icon: '⚙️' },

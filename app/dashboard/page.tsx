@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [todayLog, setTodayLog] = useState<DailyLog | null>(null);
   const [recentLogs, setRecentLogs] = useState<DailyLog[]>([]);
+  const [pendingPenaltyCount, setPendingPenaltyCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const today = todayISO();
@@ -29,7 +30,7 @@ export default function DashboardPage() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) { router.push('/login'); return; }
 
-      const [{ data: profile }, { data: logs }] = await Promise.all([
+      const [{ data: profile }, { data: logs }, { data: pendingPens }] = await Promise.all([
         supabase.from('users').select('*').eq('id', authUser.id).single(),
         supabase
           .from('daily_logs')
@@ -37,6 +38,12 @@ export default function DashboardPage() {
           .eq('user_id', authUser.id)
           .gte('date', format(subDays(new Date(), 30), 'yyyy-MM-dd'))
           .order('date', { ascending: false }),
+        supabase
+          .from('penalties')
+          .select('id')
+          .eq('user_id', authUser.id)
+          .eq('completed', false)
+          .eq('dismissed', false),
       ]);
 
       if (profile) setUser(profile as User);
@@ -45,6 +52,7 @@ export default function DashboardPage() {
         const todayEntry = logs.find((l) => l.date === today);
         if (todayEntry) setTodayLog(todayEntry as DailyLog);
       }
+      setPendingPenaltyCount(pendingPens?.length ?? 0);
       setLoading(false);
     }
     load();
@@ -216,6 +224,21 @@ export default function DashboardPage() {
                 <p className="text-xs text-slate-500 uppercase tracking-wider">30-Day Avg</p>
                 <span className="text-2xl font-bold text-slate-200">{avg30}</span>
                 <p className="text-xs text-slate-500">{scored.length} days logged</p>
+              </Card>
+
+              <Card className="flex flex-col gap-1 col-span-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-500 uppercase tracking-wider">⚠️ Penalties</p>
+                  <span className="text-xs text-amber-400">🪙 {user?.penalty_tokens ?? 0} tokens</span>
+                </div>
+                {pendingPenaltyCount === 0 ? (
+                  <span className="text-xl font-bold text-teal-400">✓ Clean</span>
+                ) : (
+                  <span className="text-2xl font-bold text-red-400">{pendingPenaltyCount} pending</span>
+                )}
+                <Link href="/penalties" className="text-xs text-violet-400 hover:text-violet-300 mt-1">
+                  View ledger →
+                </Link>
               </Card>
             </div>
           </div>
