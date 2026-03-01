@@ -24,6 +24,9 @@ export default function SettingsPage() {
   const [scoreTarget, setScoreTarget] = useState(75);
   const [weights, setWeights] = useState<DomainWeights>(DEFAULT_WEIGHTS);
   const [penaltyRules, setPenaltyRules] = useState<PenaltyRule[]>([]);
+  const [waterUnit, setWaterUnit] = useState<'oz' | 'ml'>('oz');
+  const [waterBottleSize, setWaterBottleSize] = useState(16);
+  const [waterGoal, setWaterGoal] = useState(64);
 
   const domainsOrder: (keyof DomainWeights)[] = ['body', 'wealth', 'skill', 'discipline', 'presence'];
   const domainIcons: Record<keyof DomainWeights, string> = { body: '🔥', wealth: '💰', skill: '⚡', discipline: '🛡️', presence: '❤️' };
@@ -52,6 +55,9 @@ export default function SettingsPage() {
           { id: 'doom_scroll', rule_label: 'Doom Scrolled AM', penalty_text: '10 pushups', recovery_pts: 30, enabled: true, builtin: true },
           { id: 'missed_operator_hour', rule_label: 'Missed Operator Hour', penalty_text: '+20 min skill work', recovery_pts: 30, enabled: true, builtin: true },
         ]);
+        setWaterUnit(profile.water_unit ?? 'oz');
+        setWaterBottleSize(profile.water_bottle_size ?? 16);
+        setWaterGoal(profile.water_goal ?? 64);
       }
       setLoading(false);
     }
@@ -70,6 +76,9 @@ export default function SettingsPage() {
       score_target: scoreTarget,
       domain_weights: weights,
       penalty_rules: penaltyRules,
+      water_unit: waterUnit,
+      water_bottle_size: waterBottleSize,
+      water_goal: waterGoal,
     }).eq('id', user.id);
 
     setSaving(false);
@@ -289,6 +298,100 @@ export default function SettingsPage() {
               >
                 Reset to defaults
               </button>
+            </Card>
+
+            {/* Water Tracking */}
+            <Card>
+              <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider mb-4">💧 Water Tracking</h2>
+
+              {/* Unit toggle */}
+              <div className="mb-4">
+                <label className="block text-sm text-slate-400 mb-2">Unit</label>
+                <div className="flex gap-1 bg-[#0D0D1A] border border-[#2D2D5E] rounded-lg p-1 w-fit">
+                  {(['oz', 'ml'] as const).map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => {
+                        if (u === waterUnit) return;
+                        // Convert existing values when switching units
+                        if (u === 'ml') {
+                          setWaterBottleSize(Math.round(waterBottleSize * 29.5735));
+                          setWaterGoal(Math.round(waterGoal * 29.5735));
+                        } else {
+                          setWaterBottleSize(Math.round(waterBottleSize / 29.5735));
+                          setWaterGoal(Math.round(waterGoal / 29.5735));
+                        }
+                        setWaterUnit(u);
+                      }}
+                      className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                        waterUnit === u ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {u}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bottle size */}
+              <div className="mb-4">
+                <label className="block text-sm text-slate-400 mb-1.5">
+                  Bottle Size — <span className="text-blue-400 font-bold">{waterBottleSize} {waterUnit}</span>
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={waterUnit === 'oz' ? 8 : 237}
+                    max={waterUnit === 'oz' ? 64 : 1893}
+                    step={waterUnit === 'oz' ? 1 : 10}
+                    value={waterBottleSize}
+                    onChange={(e) => setWaterBottleSize(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <input
+                    type="number"
+                    value={waterBottleSize}
+                    onChange={(e) => setWaterBottleSize(Math.max(1, Number(e.target.value)))}
+                    className="w-20 bg-[#0D0D1A] border border-[#2D2D5E] rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-slate-600 mt-1">
+                  <span>{waterUnit === 'oz' ? '8 oz' : '237 ml'}</span>
+                  <span>{waterUnit === 'oz' ? '64 oz' : '1893 ml'}</span>
+                </div>
+              </div>
+
+              {/* Daily goal */}
+              <div>
+                <label className="block text-sm text-slate-400 mb-1.5">
+                  Daily Goal — <span className="text-blue-400 font-bold">{waterGoal} {waterUnit}</span>
+                  <span className="text-slate-600 ml-2">
+                    ({Math.ceil(waterGoal / waterBottleSize)} bottle{Math.ceil(waterGoal / waterBottleSize) !== 1 ? 's' : ''})
+                  </span>
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={waterUnit === 'oz' ? 16 : 473}
+                    max={waterUnit === 'oz' ? 200 : 5920}
+                    step={waterUnit === 'oz' ? 4 : 100}
+                    value={waterGoal}
+                    onChange={(e) => setWaterGoal(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <input
+                    type="number"
+                    value={waterGoal}
+                    onChange={(e) => setWaterGoal(Math.max(1, Number(e.target.value)))}
+                    className="w-20 bg-[#0D0D1A] border border-[#2D2D5E] rounded-lg px-2 py-1.5 text-sm text-white text-center focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div className="flex justify-between text-xs text-slate-600 mt-1">
+                  <span>{waterUnit === 'oz' ? '16 oz' : '473 ml'}</span>
+                  <span>{waterUnit === 'oz' ? '200 oz' : '5920 ml'}</span>
+                </div>
+              </div>
             </Card>
 
             {/* Penalty Rules */}

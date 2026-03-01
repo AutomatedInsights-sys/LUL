@@ -38,6 +38,9 @@ export interface User {
   penalty_rules: PenaltyRule[] | null;
   penalty_tokens: number;
   penalty_tokens_spent: number;
+  water_unit: 'oz' | 'ml';
+  water_bottle_size: number;
+  water_goal: number;
   created_at: string;
 }
 
@@ -80,6 +83,8 @@ export interface DailyLog {
   daily_life_score: number | null;
   score_tier: ScoreTier | null;
   xp_awarded: number | null;
+  // Water
+  water_bottles: number | null;
   // Journal
   day_win: boolean | null;
   went_well: string | null;
@@ -112,6 +117,7 @@ export interface DailyInputs {
   noScrollAm: boolean;
   presenceMinutes: number;
   familyMeal: boolean;
+  waterBottles: number;
 }
 
 export interface ScoreResult {

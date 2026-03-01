@@ -22,6 +22,7 @@ const DEFAULT_INPUTS: DailyInputs = {
   skillMinutes: 0, skillReps: 0, skillRepTarget: 3,
   operatorHour: false, noScrollAm: false,
   presenceMinutes: 0, familyMeal: false,
+  waterBottles: 0,
 };
 
 function TimerButton({ label, onLog }: { label: string; onLog: (minutes: number) => void }) {
@@ -207,6 +208,7 @@ export default function LogPage() {
           noScrollAm: log.no_scroll_am ?? false,
           presenceMinutes: log.presence_minutes ?? 0,
           familyMeal: log.family_meal ?? false,
+          waterBottles: log.water_bottles ?? 0,
         };
         setInputs(restored);
         setJournal({
@@ -261,6 +263,7 @@ export default function LogPage() {
       no_scroll_am: inputs.noScrollAm,
       presence_minutes: inputs.presenceMinutes,
       family_meal: inputs.familyMeal,
+      water_bottles: inputs.waterBottles,
       body_score: score.body,
       wealth_score: score.wealth,
       skill_score: score.skill,
@@ -597,6 +600,99 @@ export default function LogPage() {
                 <div className="px-4 py-1">{section.fields}</div>
               </Card>
             ))}
+
+            {/* Water Tracker */}
+            {(() => {
+              const bottleSize = user?.water_bottle_size ?? 16;
+              const waterGoal = user?.water_goal ?? 64;
+              const unit = user?.water_unit ?? 'oz';
+              const goalBottles = Math.ceil(waterGoal / bottleSize);
+              const displayCount = Math.min(goalBottles, 10);
+              const consumed = inputs.waterBottles * bottleSize;
+              const pct = Math.min(100, Math.round((consumed / waterGoal) * 100));
+
+              return (
+                <Card className="overflow-hidden !p-0">
+                  <div
+                    className="flex items-center justify-between px-4 py-3 border-b border-[#1E1E3F]"
+                    style={{ borderLeftColor: '#60A5FA', borderLeftWidth: 3 }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">💧</span>
+                      <span className="font-semibold text-white">Water</span>
+                    </div>
+                    <span className="text-sm font-bold text-blue-400">
+                      {Math.round(consumed)}/{Math.round(waterGoal)} {unit}
+                    </span>
+                  </div>
+
+                  <div className="px-4 py-4">
+                    {/* Bottle grid — tap to fill up to that bottle */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {Array.from({ length: displayCount }).map((_, i) => {
+                        const filled = i < inputs.waterBottles;
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() =>
+                              update('waterBottles', filled && i === inputs.waterBottles - 1
+                                ? inputs.waterBottles - 1
+                                : i + 1)
+                            }
+                            className={`text-2xl transition-all leading-none ${filled ? '' : 'opacity-25 grayscale'}`}
+                            title={`${i + 1} bottle${i + 1 !== 1 ? 's' : ''} (${Math.round((i + 1) * bottleSize)} ${unit})`}
+                          >
+                            🫙
+                          </button>
+                        );
+                      })}
+                      {goalBottles > 10 && (
+                        <span className="text-xs text-slate-500 self-center">
+                          +{goalBottles - 10} more to goal
+                        </span>
+                      )}
+                    </div>
+
+                    {/* +/- controls */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => update('waterBottles', Math.max(0, inputs.waterBottles - 1))}
+                        className="w-9 h-9 rounded-lg bg-[#1E1E3F] hover:bg-[#2D2D5E] text-lg font-bold flex items-center justify-center transition-colors"
+                      >
+                        −
+                      </button>
+                      <div className="flex-1 text-center">
+                        <p className="text-sm font-semibold text-white">
+                          {inputs.waterBottles} / {goalBottles} bottle{goalBottles !== 1 ? 's' : ''}
+                        </p>
+                        <p className="text-xs text-slate-500">{bottleSize} {unit} each</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => update('waterBottles', inputs.waterBottles + 1)}
+                        className="w-9 h-9 rounded-lg bg-[#1E1E3F] hover:bg-[#2D2D5E] text-lg font-bold flex items-center justify-center transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="h-2 bg-[#1E1E3F] rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-300"
+                        style={{
+                          width: `${pct}%`,
+                          background: pct >= 100 ? '#34D399' : '#60A5FA',
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1.5 text-right">{pct}% of daily goal</p>
+                  </div>
+                </Card>
+              );
+            })()}
 
             {/* Rule Violations */}
             {(() => {
