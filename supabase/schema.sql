@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS public.users (
   penalty_rules JSONB DEFAULT NULL,
   penalty_tokens INTEGER DEFAULT 3,
   penalty_tokens_spent INTEGER DEFAULT 0,
+  water_unit TEXT DEFAULT 'oz',
+  water_bottle_size FLOAT DEFAULT 16,
+  water_goal FLOAT DEFAULT 64,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -59,6 +62,9 @@ CREATE TABLE IF NOT EXISTS public.daily_logs (
   daily_life_score FLOAT,
   score_tier TEXT CHECK (score_tier IN ('S', 'A', 'B', 'C', 'D')),
   xp_awarded INTEGER,
+
+  -- Water
+  water_bottles  INTEGER DEFAULT 0,
 
   -- Journal
   day_win        BOOLEAN DEFAULT NULL,
