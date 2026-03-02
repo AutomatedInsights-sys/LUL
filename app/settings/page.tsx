@@ -108,6 +108,7 @@ export default function SettingsPage() {
       'skill_minutes', 'skill_reps',
       'operator_hour', 'no_scroll_am',
       'presence_minutes', 'family_meal',
+      'water_bottles',
       'body_score', 'wealth_score', 'skill_score', 'discipline_score', 'presence_score',
       'daily_life_score', 'score_tier', 'xp_awarded',
     ];
@@ -316,11 +317,11 @@ export default function SettingsPage() {
                         if (u === waterUnit) return;
                         // Convert existing values when switching units
                         if (u === 'ml') {
-                          setWaterBottleSize(Math.round(waterBottleSize * 29.5735));
-                          setWaterGoal(Math.round(waterGoal * 29.5735));
+                          setWaterBottleSize(Math.max(1, Math.round(waterBottleSize * 29.5735)));
+                          setWaterGoal(Math.max(1, Math.round(waterGoal * 29.5735)));
                         } else {
-                          setWaterBottleSize(Math.round(waterBottleSize / 29.5735));
-                          setWaterGoal(Math.round(waterGoal / 29.5735));
+                          setWaterBottleSize(Math.max(1, Math.round(waterBottleSize / 29.5735)));
+                          setWaterGoal(Math.max(1, Math.round(waterGoal / 29.5735)));
                         }
                         setWaterUnit(u);
                       }}
